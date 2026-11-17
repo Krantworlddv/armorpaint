@@ -9,36 +9,38 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repository with submodules
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Generate project files
         working-directory: paint
         shell: cmd
         run: ..\base\make.bat
 
-      - name: Locate and Compile ArmorPaint
+      - name: Compile ArmorPaint
         working-directory: paint
         shell: pwsh
         run: |
-          Get-ChildItem -Recurse -Depth 3
-          $sln = Get-ChildItem -Recurse -Filter "*.sln" | Select-Object -First 1
-          if ($sln) {
-            Write-Host "Found solution: $($sln.FullName)"
-            msbuild $sln.FullName /p:Configuration=Release /p:Platform=x64
-          } else {
-            Write-Host "No .sln generated; checking if make.bat compiled directly."
+          $vcxproj = Get-ChildItem -Recurse -Filter "ArmorPaint.vcxproj" | Select-Object -First 1
+          if (-not $vcxproj) {
+            Get-ChildItem -Recurse -Depth 3
+            throw "ArmorPaint.vcxproj not found! Check make.bat output above."
           }
+          msbuild $vcxproj.FullName /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=ClangCL
 
       - name: Package executable and data
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
           $exe = Get-ChildItem -Path paint -Recurse -Filter "ArmorPaint.exe" | Select-Object -First 1
-          if (-not $exe) { throw "ArmorPaint.exe was not generated! Check the make.bat output above." }
+          if (-not $exe) { throw "ArmorPaint.exe was not generated!" }
           Copy-Item $exe.FullName dist\
           $dataDir = Get-ChildItem -Path paint -Recurse -Directory -Filter "data" | Select-Object -First 1
           if ($dataDir) { Copy-Item -Recurse $dataDir.FullName dist\ }
