@@ -12,10 +12,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup MSVC and Clang
+      - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
-        with:
-          toolset: ClangCL
 
       - name: Generate project files
         working-directory: paint
