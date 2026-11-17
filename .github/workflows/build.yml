@@ -14,20 +14,36 @@ jobs:
 
       - name: Setup MSVC and Clang
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          toolset: ClangCL
 
       - name: Generate project files
         working-directory: paint
-        run: ..\base\make
+        shell: cmd
+        run: ..\base\make.bat
 
-      - name: Compile ArmorPaint
+      - name: Locate and Compile ArmorPaint
         working-directory: paint
-        run: msbuild build\ArmorPaint.sln /p:Configuration=Release /p:Platform=x64
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Depth 3
+          $sln = Get-ChildItem -Recurse -Filter "*.sln" | Select-Object -First 1
+          if ($sln) {
+            Write-Host "Found solution: $($sln.FullName)"
+            msbuild $sln.FullName /p:Configuration=Release /p:Platform=x64
+          } else {
+            Write-Host "No .sln generated; checking if make.bat compiled directly."
+          }
 
       - name: Package executable and data
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
-          Copy-Item paint\build\x64\Release\ArmorPaint.exe dist\
-          Copy-Item -Recurse paint\build\out\* dist\
+          $exe = Get-ChildItem -Path paint -Recurse -Filter "ArmorPaint.exe" | Select-Object -First 1
+          if (-not $exe) { throw "ArmorPaint.exe was not generated! Check the make.bat output above." }
+          Copy-Item $exe.FullName dist\
+          $dataDir = Get-ChildItem -Path paint -Recurse -Directory -Filter "data" | Select-Object -First 1
+          if ($dataDir) { Copy-Item -Recurse $dataDir.FullName dist\ }
 
       - name: Upload Windows Build
         uses: actions/upload-artifact@v4
