@@ -1,0 +1,36 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC and Clang
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Generate project files
+        working-directory: paint
+        run: ..\base\make
+
+      - name: Compile ArmorPaint
+        working-directory: paint
+        run: msbuild build\ArmorPaint.sln /p:Configuration=Release /p:Platform=x64
+
+      - name: Package executable and data
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item paint\build\x64\Release\ArmorPaint.exe dist\
+          Copy-Item -Recurse paint\build\out\* dist\
+
+      - name: Upload Windows Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArmorPaint-Windows
+          path: dist/
